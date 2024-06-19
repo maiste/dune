@@ -405,7 +405,8 @@ module Expander0 = struct
   include Expander0
 
   type t =
-    { paths : Paths.t
+    { name : Dune_pkg.Package_name.t
+    ; paths : Paths.t
     ; artifacts : Path.t Filename.Map.t
     ; depends : (Variable.value Package_variable_name.Map.t * Paths.t) Package.Name.Map.t
     ; context : Context_name.t
@@ -525,6 +526,7 @@ module Run_with_path = struct
       { prog : Action.Prog.t
       ; args : 'path arg Array.Immutable.t
       ; ocamlfind_destdir : 'path
+      ; pkg_name : Dune_pkg.Package_name.t option
       }
 
     let name = "run-with-path"
@@ -545,7 +547,7 @@ module Run_with_path = struct
 
     let is_useful_to ~memoize:_ = true
 
-    let encode { prog; args; ocamlfind_destdir } path _ : Dune_lang.t =
+    let encode { prog; args; ocamlfind_destdir; _ } path _ : Dune_lang.t =
       let prog =
         Dune_lang.atom_or_quoted_string
         @@
@@ -567,7 +569,7 @@ module Run_with_path = struct
     ;;
 
     let action
-      { prog; args; ocamlfind_destdir }
+      { prog; args; ocamlfind_destdir; pkg_name }
       ~(ectx : Action.Ext.context)
       ~(eenv : Action.Ext.env)
       =
@@ -606,14 +608,14 @@ module Run_with_path = struct
     ;;
   end
 
-  let action prog args ~ocamlfind_destdir =
+  let action ?pkg_name prog args ~ocamlfind_destdir =
     let module M = struct
       type path = Path.t
       type target = Path.Build.t
 
       module Spec = Spec
 
-      let v = { Spec.prog; args; ocamlfind_destdir }
+      let v = { Spec.prog; args; ocamlfind_destdir; pkg_name }
     end
     in
     Action.Extension (module M)
@@ -742,7 +744,7 @@ module Action_expander = struct
     ;;
 
     let expand_pform
-      { env = _; paths; artifacts = _; context; depends; version = _ }
+      { name = _; env = _; paths; artifacts = _; context; depends; version = _ }
       ~source
       (pform : Pform.t)
       : (Value.t list, [ `Undefined_pkg_var of Package_variable_name.t ]) result Memo.t
@@ -877,7 +879,7 @@ module Action_expander = struct
          let ocamlfind_destdir =
            (Lazy.force expander.paths.install_roots).lib_root |> Path.build
          in
-         Run_with_path.action exe args ~ocamlfind_destdir)
+         Run_with_path.action ~pkg_name:expander.name exe args ~ocamlfind_destdir)
     | Progn t ->
       let+ args = Memo.parallel_map t ~f:(expand ~expander) in
       Action.Progn args
@@ -1007,6 +1009,7 @@ module Action_expander = struct
         (Pkg_info.variables pkg.info, pkg.paths)
     in
     { Expander.paths = pkg.paths
+    ; name = pkg.info.name
     ; artifacts = binaries
     ; context
     ; depends

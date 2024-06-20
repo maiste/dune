@@ -527,7 +527,7 @@ module Run_with_path = struct
       -> string
       -> t
 
-    val consume_and_print_error : t -> Display.t -> code:int -> unit
+    val consume_and_print_error : t -> Display.t -> code:int -> loc:Loc.t -> unit
   end = struct
     type state =
       | Open
@@ -571,7 +571,7 @@ module Run_with_path = struct
                 [ Pp.text "Run_with_path: impossible to read data from a closed state" ]))
     ;;
 
-    let error_msg pkg_name error =
+    let error_msg ~loc pkg_name error =
       let open Pp.O in
       let pp_package =
         match pkg_name with
@@ -580,20 +580,20 @@ module Run_with_path = struct
           let pkg_name = Dune_pkg.Package_name.to_string pkg_name in
           Pp.(char '[' ++ tag User_message.Style.Error (verbatim pkg_name) ++ char ']')
       in
-      User_message.make ~prefix:pp_package [ Pp.verbatim error ]
+      User_message.make ~loc ~prefix:pp_package [ Pp.verbatim error ]
     ;;
 
-    let consume_and_print_error t display ~code =
+    let consume_and_print_error t display ~code ~loc =
       match Predicate.test t.accepted_exit_codes code, display with
       | false, _ ->
-        let msg = read t |> error_msg t.pkg_name in
+        let msg = read t |> error_msg ~loc t.pkg_name in
         close t;
         raise (User_error.E msg)
       | true, Display.Verbose ->
         let error = read t in
         if has_output error
         then (
-          let msg = error_msg t.pkg_name error in
+          let msg = error_msg ~loc t.pkg_name error in
           close t;
           Console.print_user_message msg)
       | true, _ -> ()
@@ -612,6 +612,7 @@ module Run_with_path = struct
       ; args : 'path arg Array.Immutable.t
       ; ocamlfind_destdir : 'path
       ; pkg_name : Dune_pkg.Package_name.t option
+      ; loc : Loc.t
       }
 
     let name = "run-with-path"
@@ -654,7 +655,7 @@ module Run_with_path = struct
     ;;
 
     let action
-      { prog; args; ocamlfind_destdir; pkg_name }
+      { prog; args; ocamlfind_destdir; pkg_name; loc }
       ~(ectx : Action.Ext.context)
       ~(eenv : Action.Ext.env)
       =
@@ -696,19 +697,19 @@ module Run_with_path = struct
           ~dir:eenv.working_dir
           ~env
         >>= fun (_, code) ->
-        Output.consume_and_print_error stderr display ~code;
+        Output.consume_and_print_error ~loc stderr display ~code;
         Fiber.return ()
     ;;
   end
 
-  let action ?pkg_name prog args ~ocamlfind_destdir =
+  let action ~loc ?pkg_name prog args ~ocamlfind_destdir =
     let module M = struct
       type path = Path.t
       type target = Path.Build.t
 
       module Spec = Spec
 
-      let v = { Spec.prog; args; ocamlfind_destdir; pkg_name }
+      let v = { Spec.prog; args; ocamlfind_destdir; pkg_name; loc }
     end
     in
     Action.Extension (module M)
@@ -972,7 +973,12 @@ module Action_expander = struct
          let ocamlfind_destdir =
            (Lazy.force expander.paths.install_roots).lib_root |> Path.build
          in
-         Run_with_path.action ~pkg_name:expander.name exe args ~ocamlfind_destdir)
+         Run_with_path.action
+           ~loc:prog_loc
+           ~pkg_name:expander.name
+           exe
+           args
+           ~ocamlfind_destdir)
     | Progn t ->
       let+ args = Memo.parallel_map t ~f:(expand ~expander) in
       Action.Progn args

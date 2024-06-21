@@ -517,84 +517,59 @@ end
 
 module Run_with_path = struct
   module Output : sig
-    type t
+    type error
 
-    val io : t -> Process.Io.output Process.Io.t
+    val io : error -> Process.Io.output Process.Io.t
 
-    val v
-      :  ?accepted_exit_codes:int Predicate.t
-      -> ?pkg_name:Dune_lang.Package_name.t
-      -> string
-      -> t
+    val with_error
+      :  accepted_exit_codes:int Predicate.t
+      -> pkg_name:Dune_pkg.Package_name.t option
+      -> display:Display.t
+      -> (error -> 'a)
+      -> 'a
 
-    val consume_and_print_error : t -> Display.t -> code:int -> loc:Loc.t -> unit
+    val prerr : loc:Loc.t -> rc:int -> error -> unit
   end = struct
-    type state =
-      | Open
-      | Closed
-
-    type t =
+    type error =
       { pkg_name : Dune_pkg.Package_name.t option
-      ; fn : Dpath.t
+      ; filename : Dpath.t
       ; io : Process.Io.output Process.Io.t
       ; accepted_exit_codes : int Predicate.t
-      ; mutable state : state
+      ; display : Display.t
       }
-
-    let prefix = "dune-pkg"
-    let exit_code_zero = Predicate.create (fun x -> x = 0)
-    let has_output error = error <> ""
-
-    let v ?(accepted_exit_codes = exit_code_zero) ?pkg_name suffix =
-      let fn = Temp.create File ~prefix ~suffix in
-      let io = Process.Io.(file fn Out) in
-      let state = Open in
-      { pkg_name; fn; io; state; accepted_exit_codes }
-    ;;
 
     let io t = t.io
 
-    let close t =
-      t.state <- Closed;
-      Temp.destroy File t.fn
-    ;;
-
-    let read t =
-      match t.state with
-      | Open ->
-        let content = Stdune.Io.read_file t.fn in
-        content
-      | Closed ->
-        raise
-          (User_error.E
-             (User_message.make
-                [ Pp.text "Run_with_path: impossible to read data from a closed state" ]))
+    let with_error ~accepted_exit_codes ~pkg_name ~display f =
+      let filename = Temp.create File ~prefix:"dune-pkg" ~suffix:"stderr" in
+      let io = Process.Io.(file filename Out) in
+      let t = { pkg_name; filename; io; accepted_exit_codes; display } in
+      let result = f t in
+      Temp.destroy File filename;
+      result
     ;;
 
     let error_msg ~loc pkg_name error =
-      let open Pp.O in
       let pp_package =
         match pkg_name with
         | None -> Pp.nop
         | Some pkg_name ->
           let pkg_name = Dune_pkg.Package_name.to_string pkg_name in
-          Pp.(char '[' ++ tag User_message.Style.Error (verbatim pkg_name) ++ char ']')
+          Pp.text pkg_name
       in
       User_message.make ~loc ~prefix:pp_package [ Pp.verbatim error ]
     ;;
 
-    let consume_and_print_error t display ~code ~loc =
-      match Predicate.test t.accepted_exit_codes code, display with
+    let prerr ~loc ~rc t =
+      match Predicate.test t.accepted_exit_codes rc, t.display with
       | false, _ ->
-        let msg = read t |> error_msg ~loc t.pkg_name in
-        close t;
+        let msg = Stdune.Io.read_file t.filename |> error_msg ~loc t.pkg_name in
         raise (User_error.E msg)
       | true, Display.Verbose ->
-        let error = read t in
-        if has_output error
+        let error = Stdune.Io.read_file t.filename in
+        if not (String.is_empty error)
         then (
           let msg = error_msg ~loc t.pkg_name error in
-          close t;
           Console.print_user_message msg)
       | true, _ -> ()
     ;;
@@ -633,7 +608,9 @@ module Run_with_path = struct
 
     let is_useful_to ~memoize:_ = true
 
-    let encode { prog; args; ocamlfind_destdir; _ } path _ : Dune_lang.t =
+    let encode { prog; args; ocamlfind_destdir; pkg_name = _; loc = _ } path _
+      : Dune_lang.t
+      =
       let prog =
         Dune_lang.atom_or_quoted_string
         @@
@@ -678,27 +655,30 @@ module Run_with_path = struct
             ~var:"OCAMLFIND_DESTDIR"
             ~value:(Path.to_absolute_filename ocamlfind_destdir)
         in
-        let stdout_to =
-          match display with
-          | Display.Verbose -> eenv.stdout_to
-          | _ -> Process.Io.(null Out)
-        in
-        let stderr = Output.v ~accepted_exit_codes:eenv.exit_codes ?pkg_name "stderr" in
-        let stderr_to = Output.io stderr in
-        Process.run
-          Return
-          prog
-          args
+        Output.with_error
+          ~accepted_exit_codes:eenv.exit_codes
+          ~pkg_name
           ~display
-          ~metadata
-          ~stdout_to
-          ~stderr_to
-          ~stdin_from:eenv.stdin_from
-          ~dir:eenv.working_dir
-          ~env
-        >>= fun (_, code) ->
-        Output.consume_and_print_error ~loc stderr display ~code;
-        Fiber.return ()
+          (fun error ->
+             let stdout_to =
+               match display with
+               | Display.Verbose -> eenv.stdout_to
+               | _ -> Process.Io.(null Out)
+             in
+             Process.run
+               Return
+               prog
+               args
+               ~display
+               ~metadata
+               ~stdout_to
+               ~stderr_to:(Output.io error)
+               ~stdin_from:eenv.stdin_from
+               ~dir:eenv.working_dir
+               ~env
+             >>= fun (_, rc) ->
+             Output.prerr ~loc ~rc error;
+             Fiber.return ())
     ;;
   end
 

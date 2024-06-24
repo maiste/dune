@@ -523,15 +523,15 @@ module Run_with_path = struct
 
     val with_error
       :  accepted_exit_codes:int Predicate.t
-      -> pkg_name:Dune_pkg.Package_name.t option
+      -> pkg:Dune_pkg.Package_name.t * Loc.t
       -> display:Display.t
       -> (error -> 'a)
       -> 'a
 
-    val prerr : loc:Loc.t -> rc:int -> error -> unit
+    val prerr : rc:int -> error -> unit
   end = struct
     type error =
-      { pkg_name : Dune_pkg.Package_name.t option
+      { pkg : Dune_pkg.Package_name.t * Loc.t
       ; filename : Dpath.t
       ; io : Process.Io.output Process.Io.t
       ; accepted_exit_codes : int Predicate.t
@@ -540,36 +540,34 @@ module Run_with_path = struct
 
     let io t = t.io
 
-    let with_error ~accepted_exit_codes ~pkg_name ~display f =
+    let with_error ~accepted_exit_codes ~pkg ~display f =
       let filename = Temp.create File ~prefix:"dune-pkg" ~suffix:"stderr" in
       let io = Process.Io.(file filename Out) in
-      let t = { pkg_name; filename; io; accepted_exit_codes; display } in
+      let t = { filename; io; accepted_exit_codes; display; pkg } in
       let result = f t in
       Temp.destroy File filename;
       result
     ;;
 
-    let error_msg ~loc pkg_name error =
-      let pp_package =
-        match pkg_name with
-        | None -> Pp.nop
-        | Some pkg_name ->
-          let pkg_name = Dune_pkg.Package_name.to_string pkg_name in
-          Pp.text pkg_name
+    let error_msg t error =
+      let pp_pkg =
+        let pkg_name = Dune_pkg.Package_name.to_string (fst t.pkg) in
+        Pp.textf "Package %s fails to build" pkg_name
       in
-      User_message.make ~loc ~prefix:pp_package [ Pp.verbatim error ]
+      let loc = snd t.pkg in
+      User_message.make ~loc [ pp_pkg; Pp.verbatim error ]
     ;;
 
-    let prerr ~loc ~rc t =
+    let prerr ~rc t =
       match Predicate.test t.accepted_exit_codes rc, t.display with
       | false, _ ->
-        let msg = Stdune.Io.read_file t.filename |> error_msg ~loc t.pkg_name in
+        let msg = Stdune.Io.read_file t.filename |> error_msg t in
         raise (User_error.E msg)
       | true, Display.Verbose ->
         let error = Stdune.Io.read_file t.filename in
         if not (String.is_empty error)
         then (
-          let msg = error_msg ~loc t.pkg_name error in
+          let msg = error_msg t error in
           Console.print_user_message msg)
       | true, _ -> ()
     ;;
@@ -586,8 +584,7 @@ module Run_with_path = struct
       { prog : Action.Prog.t
       ; args : 'path arg Array.Immutable.t
       ; ocamlfind_destdir : 'path
-      ; pkg_name : Dune_pkg.Package_name.t option
-      ; loc : Loc.t
+      ; pkg : Dune_pkg.Package_name.t * Loc.t
       }
 
     let name = "run-with-path"
@@ -608,9 +605,7 @@ module Run_with_path = struct
 
     let is_useful_to ~memoize:_ = true
 
-    let encode { prog; args; ocamlfind_destdir; pkg_name = _; loc = _ } path _
-      : Dune_lang.t
-      =
+    let encode { prog; args; ocamlfind_destdir; pkg = _ } path _ : Dune_lang.t =
       let prog =
         Dune_lang.atom_or_quoted_string
         @@
@@ -632,7 +627,7 @@ module Run_with_path = struct
     ;;
 
     let action
-      { prog; args; ocamlfind_destdir; pkg_name; loc }
+      { prog; args; ocamlfind_destdir; pkg }
       ~(ectx : Action.Ext.context)
       ~(eenv : Action.Ext.env)
       =
@@ -655,41 +650,37 @@ module Run_with_path = struct
             ~var:"OCAMLFIND_DESTDIR"
             ~value:(Path.to_absolute_filename ocamlfind_destdir)
         in
-        Output.with_error
-          ~accepted_exit_codes:eenv.exit_codes
-          ~pkg_name
-          ~display
-          (fun error ->
-             let stdout_to =
-               match display with
-               | Display.Verbose -> eenv.stdout_to
-               | _ -> Process.Io.(null Out)
-             in
-             Process.run
-               Return
-               prog
-               args
-               ~display
-               ~metadata
-               ~stdout_to
-               ~stderr_to:(Output.io error)
-               ~stdin_from:eenv.stdin_from
-               ~dir:eenv.working_dir
-               ~env
-             >>= fun (_, rc) ->
-             Output.prerr ~loc ~rc error;
-             Fiber.return ())
+        Output.with_error ~accepted_exit_codes:eenv.exit_codes ~pkg ~display (fun error ->
+          let stdout_to =
+            match display with
+            | Display.Verbose -> eenv.stdout_to
+            | _ -> Process.Io.(null Out)
+          in
+          Process.run
+            Return
+            prog
+            args
+            ~display
+            ~metadata
+            ~stdout_to
+            ~stderr_to:(Output.io error)
+            ~stdin_from:eenv.stdin_from
+            ~dir:eenv.working_dir
+            ~env
+          >>= fun (_, rc) ->
+          Output.prerr ~rc error;
+          Fiber.return ())
     ;;
   end
 
-  let action ~loc ?pkg_name prog args ~ocamlfind_destdir =
+  let action ~pkg prog args ~ocamlfind_destdir =
     let module M = struct
       type path = Path.t
       type target = Path.Build.t
 
       module Spec = Spec
 
-      let v = { Spec.prog; args; ocamlfind_destdir; pkg_name; loc }
+      let v = { Spec.prog; args; ocamlfind_destdir; pkg }
     end
     in
     Action.Extension (module M)
@@ -953,12 +944,7 @@ module Action_expander = struct
          let ocamlfind_destdir =
            (Lazy.force expander.paths.install_roots).lib_root |> Path.build
          in
-         Run_with_path.action
-           ~loc:prog_loc
-           ~pkg_name:expander.name
-           exe
-           args
-           ~ocamlfind_destdir)
+         Run_with_path.action ~pkg:(expander.name, prog_loc) exe args ~ocamlfind_destdir)
     | Progn t ->
       let+ args = Memo.parallel_map t ~f:(expand ~expander) in
       Action.Progn args

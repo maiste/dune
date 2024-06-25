@@ -3,13 +3,13 @@ Test the error message when installing package that fails.
   $ . ./helpers.sh
   $ make_lockdir
 
-Make a project with two packages, one successful and, one that fails:
+Make a project with two packages, one successful and one that fails:
 
   $ cat > dune-project << EOF
   > (lang dune 3.12)
   > EOF
 
-We create a package with a failing command that throws an error:
+Create a package with a failing command that throws an error:
 
   $ make_lockpkg x << EOF
   > (version 0.0.1)
@@ -29,7 +29,7 @@ Building the package should fail and print an error:
   
   [1]
 
-We create a package with a succeeding command that displays some text:
+Create a package with a succeeding command that displays some text:
 
   $ make_lockpkg y << EOF
   > (version 0.0.1)

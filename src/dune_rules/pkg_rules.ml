@@ -549,28 +549,26 @@ module Run_with_path = struct
       result
     ;;
 
-    let error_msg ~is_critical t error =
+    let to_paragraphs t error =
       let pp_pkg =
         let pkg_name = Dune_pkg.Package_name.to_string (fst t.pkg) in
-        if is_critical
-        then Pp.textf "Package %s fails to build" pkg_name
-        else Pp.textf "Package %s prints some errors" pkg_name
+        Pp.textf "Logs for package %s" pkg_name
       in
       let loc = snd t.pkg in
-      User_message.make ~loc [ pp_pkg; Pp.verbatim error ]
+      [ pp_pkg; Pp.verbatim error ], loc
     ;;
 
-    let prerr ~rc t =
-      match Predicate.test t.accepted_exit_codes rc, t.display with
+    let prerr ~rc error =
+      match Predicate.test error.accepted_exit_codes rc, error.display with
       | false, _ ->
-        let msg = Stdune.Io.read_file t.filename |> error_msg ~is_critical:true t in
-        raise (User_error.E msg)
+        let paragraphs, loc = Stdune.Io.read_file error.filename |> to_paragraphs error in
+        User_warning.emit ~loc ~is_error:true paragraphs
       | true, Display.Verbose ->
-        let error = Stdune.Io.read_file t.filename in
-        if not (String.is_empty error)
+        let content = Stdune.Io.read_file error.filename in
+        if not (String.is_empty content)
         then (
-          let msg = error_msg ~is_critical:false t error in
-          Console.print_user_message msg)
+          let paragraphs, loc = to_paragraphs error content in
+          User_warning.emit ~loc paragraphs)
       | true, _ -> ()
     ;;
   end

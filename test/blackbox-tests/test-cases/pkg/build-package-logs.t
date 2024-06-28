@@ -2,6 +2,7 @@ Test the error message when installing package that fails.
 
   $ . ./helpers.sh
   $ make_lockdir
+  $ export DUNE_DEBUG_PACKAGE_LOGS=0
 
 Make a project with two packages, one successful and one that fails:
 
@@ -13,7 +14,7 @@ Create a package with a failing command that throws an error:
 
   $ make_lockpkg x << EOF
   > (version 0.0.1)
-  > (build 
+  > (build
   >    (progn
   >       (run cat i_dont_exist)))
   > EOF

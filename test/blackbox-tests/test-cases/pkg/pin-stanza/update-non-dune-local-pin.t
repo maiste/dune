@@ -37,11 +37,14 @@ Make a package "foo" whose build will fail after printing a message:
 
 Attempt to build the package the first time:
 (the error from make is grep'd out because it is not consistant across different systems)
-  $ dune build 2>&1 | grep -v make
+  $ dune build --debug-package-logs 2>&1 | grep -v make
   echo aaa
   aaa
   false
-  -> required by _build/_private/default/.pkg/foo/target/cookie
+  File "dune.lock/foo.pkg", line 4, characters 6-13:
+            ^^^^^^^
+  Error: Logs for package foo
+  
 
 Update the message that gets printed while building foo:
   $ cat >foo/Makefile <<EOF
@@ -51,8 +54,11 @@ Update the message that gets printed while building foo:
   > EOF
 
 The change to the package is picked up:
-  $ dune build 2>&1 | grep -v make
+  $ dune build --debug-package-logs 2>&1 | grep -v make
   echo bbb
   bbb
   false
-  -> required by _build/_private/default/.pkg/foo/target/cookie
+  File "dune.lock/foo.pkg", line 4, characters 6-13:
+            ^^^^^^^
+  Error: Logs for package foo
+  

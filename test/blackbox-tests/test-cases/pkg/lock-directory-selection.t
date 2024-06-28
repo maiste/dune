@@ -76,12 +76,12 @@ are only dependent on on certain systems.
 
 Build macos package on macos:
   $ dune clean
-  $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=arm64 dune build _build/_private/default/.pkg/macos-only/target/
+  $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=arm64 dune build --debug-package-logs _build/_private/default/.pkg/macos-only/target/
   macos-only
 
 Build macos package on macos:
   $ dune clean
-  $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=amd64 dune build _build/_private/default/.pkg/macos-only/target/
+  $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=amd64 dune build  --debug-package-logs _build/_private/default/.pkg/macos-only/target/
   macos-only
 
 Build linux package on macos (will fail):
@@ -98,7 +98,7 @@ Build macos package on linux (will fail):
 
 Build linux package on linux:
   $ dune clean
-  $ DUNE_CONFIG__OS=linux DUNE_CONFIG__ARCH=amd64 dune build _build/_private/default/.pkg/linux-only/target/
+  $ DUNE_CONFIG__OS=linux DUNE_CONFIG__ARCH=amd64 dune build  --debug-package-logs _build/_private/default/.pkg/linux-only/target/
   linux-only
 
 Try setting the os to one which doesn't have a corresponding lockdir:
@@ -133,5 +133,5 @@ Test that cond statements can have a default value:
   Solution for dune.lock:
   - linux-only.0.0.1
   $ dune clean
-  $ dune build _build/_private/default/.pkg/linux-only/target/
+  $ dune build  --debug-package-logs _build/_private/default/.pkg/linux-only/target/
   linux-only

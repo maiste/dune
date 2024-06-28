@@ -5,7 +5,11 @@ dune="dune"
 pkg_root="_build/_private/default/.pkg"
 
 build_pkg() {
-  $dune build $pkg_root/$1/target/
+  if [ $DUNE_DEBUG_PACKAGE_LOGS -eq 1 ] ; then
+    $dune build --debug-package-logs $pkg_root/$1/target/
+  else
+    $dune build $pkg_root/$1/target/
+  fi
 }
 
 show_pkg() {

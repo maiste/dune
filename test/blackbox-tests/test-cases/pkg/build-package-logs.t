@@ -21,14 +21,13 @@ Create a package with a failing command that throws an error:
 
 Building the package should fail and print an error:
 
-  $ build_pkg x
+  $ build_pkg x 2>&1 | sed -E 's#/.*/cat#cat#g'
   File "dune.lock/x.pkg", line 4, characters 11-14:
   4 |       (run cat i_dont_exist)))
                  ^^^
   Error: Logs for package x
-  /usr/bin/cat: i_dont_exist: No such file or directory
+  cat: i_dont_exist: No such file or directory
   
-  [1]
 
 Create a package with a succeeding command that displays some text:
 

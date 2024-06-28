@@ -13,14 +13,14 @@ Create a package with a failing command that throws an error:
 
   $ make_lockpkg x << EOF
   > (version 0.0.1)
-  > (build 
+  > (build
   >    (progn
   >       (run cat i_dont_exist)))
   > EOF
 
 Building the package should fail and print an error:
 
-  $ build_pkg x
+  $ (unset INSIDE_DUNE ; build_pkg x)
   File "dune.lock/x.pkg", line 4, characters 11-14:
   4 |       (run cat i_dont_exist)))
                  ^^^
@@ -40,7 +40,7 @@ Create a package with a succeeding command that displays some text:
 
 Building the package should succeed and print no output:
 
-  $ build_pkg y
+  $ (unset INSIDE_DUNE ; build_pkg y)
 
 Checks the package is installed:
 

@@ -652,8 +652,8 @@ module Run_with_path = struct
         in
         Output.with_error ~accepted_exit_codes:eenv.exit_codes ~pkg ~display (fun error ->
           let stdout_to =
-            match display with
-            | Display.Verbose -> eenv.stdout_to
+            match Dune_util.Execution_env.inside_dune, display with
+            | true, _ | false, Display.Verbose -> eenv.stdout_to
             | _ -> Process.Io.(null Out)
           in
           Process.run

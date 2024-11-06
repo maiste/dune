@@ -356,6 +356,17 @@ let gen_project_rules =
     and+ () = Odoc_new.gen_project_rules sctx project
     and+ () = Ocaml_index.project_rule sctx project
     and+ () =
+      let ctx = Super_context.context sctx in
+      let ctx_name = Context.name ctx in
+      let* is_lock_dir_active = Lock_dir.lock_dir_active ctx_name in
+      if is_lock_dir_active
+      then (
+        let dir =
+          Path.Build.append_source (Context.build_dir ctx) @@ Dune_project.root project
+        in
+        Pkg_rules.gen_rule_from_universe ~dir ctx_name)
+      else Memo.return ()
+    and+ () =
       let version = 2, 8 in
       match Dune_project.allow_approximate_merlin project with
       | None -> Memo.return ()

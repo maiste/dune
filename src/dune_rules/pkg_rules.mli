@@ -22,3 +22,6 @@ val which : Context_name.t -> (Filename.t -> Path.t option Memo.t) Staged.t
 val exported_env : Context_name.t -> Env.t Memo.t
 val ocamlpath : Context_name.t -> Path.t list Memo.t
 val find_package : Context_name.t -> Package.Name.t -> unit Action_builder.t option Memo.t
+
+(** TODO: Give me a better description. *)
+val gen_rule_from_universe : dir:Path.Build.t -> Context_name.t -> unit Memo.t

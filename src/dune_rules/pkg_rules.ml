@@ -1937,16 +1937,13 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
        ~directory_targets:[ pkg.write_paths.target_dir ]
 ;;
 
-let gen_rule_from_universe ~dir ctx_name =
-  let to_target_path pkg =
+let gen_rule_alias_from_package_universe ~dir ctx_name =
+  let target_path_of_pkg pkg =
     let pkg_name = Dune_lang.Package_name.to_string pkg in
-    let path =
-      Path.Build.L.relative
-        Private_context.t.build_dir
-        [ Context_name.to_string ctx_name; ".pkg"; pkg_name; "target" ]
-      |> Path.build
-    in
-    path
+    Path.Build.L.relative
+      Private_context.t.build_dir
+      [ Context_name.to_string ctx_name; ".pkg"; pkg_name; "target" ]
+    |> Path.build
   in
   let* packages =
     Package_universe.lock_dir (Project_dependencies ctx_name)
@@ -1954,8 +1951,9 @@ let gen_rule_from_universe ~dir ctx_name =
     >>| Dune_lang.Package_name.Map.keys
   in
   let alias = Alias.make Alias0.pkg_install ~dir in
-  let package_targets = List.map ~f:to_target_path packages in
-  Action_builder.paths package_targets |> Rules.Produce.Alias.add_deps alias
+  List.map ~f:target_path_of_pkg packages
+  |> Action_builder.paths
+  |> Rules.Produce.Alias.add_deps alias
 ;;
 
 let gen_rules context_name (pkg : Pkg.t) =

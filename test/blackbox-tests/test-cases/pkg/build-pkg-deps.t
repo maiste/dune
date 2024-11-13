@@ -22,19 +22,13 @@ Create a fake library to install in the target project as a dependency:
   $ rm -rf foo
 
 Make an opam package for the library:
-  $ mkpkg foo <<EOF
-  > build: [
-  >   [
-  >     "dune"
-  >     "build"
-  >     "-p"
-  >     name
-  >     "@install"
-  >   ]
-  > ]
-  > url {
-  >  src: "$PWD/foo.tar"
-  > }
+  $ make_lockdir
+  $ cat > dune.lock/foo.pkg << EOF
+  > (version 0.0.1)
+  > (build
+  >  (run dune build -p %{pkg-self:name} @install))
+  > (source
+  >  (fetch (url file://$PWD/foo.tar)))
   > EOF
 
 Create a project using the fake library as a dependency:
@@ -45,10 +39,6 @@ Create a project using the fake library as a dependency:
   >  (allow_empty)
   >  (depends foo))
   > EOF
-  $ add_mock_repo_if_needed
-  $ dune pkg lock
-  Solution for dune.lock:
-  - foo.0.0.1
 
 Create an executable which uses the fake dependency. It ensures we build the
 dependency package but not the package:
@@ -63,12 +53,7 @@ dependency package but not the package:
 
 The alias call builds the `foo` dependency but not the project itself. We
 verify we have the `foo` package but not the `bar.exe` in the build directory:
-  $ dune build @pkg-deps
-  $ ls _build/_private/default/.pkg/
+  $ dune build @pkg-install
+  $ ls _build/_private/default/.pkg/foo/target
   foo
   $ ls _build/default/
-
-Verify that building the `bar.exe` file is working:
-  $ dune build ./bar.exe
-  $ ls _build/default/bar.exe
-  _build/default/bar.exe

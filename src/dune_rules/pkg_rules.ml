@@ -173,6 +173,7 @@ module Paths = struct
 
   let install_paths t = Lazy.force t.install_paths
   let install_roots t = Lazy.force t.install_roots
+  let target_dir t = t.target_dir
 end
 
 module Install_cookie = struct
@@ -1938,20 +1939,18 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
 ;;
 
 let gen_rule_alias_from_package_universe ~dir ctx_name =
-  let target_path_of_pkg pkg =
-    let pkg_name = Dune_lang.Package_name.to_string pkg in
-    Path.Build.L.relative
-      Private_context.t.build_dir
-      [ Context_name.to_string ctx_name; ".pkg"; pkg_name; "target" ]
-    |> Path.build
-  in
   let* packages =
     Package_universe.lock_dir (Project_dependencies ctx_name)
     >>| (fun lock_dir -> lock_dir.packages)
     >>| Dune_lang.Package_name.Map.keys
   in
   let alias = Alias.make Alias0.pkg_install ~dir in
-  List.map ~f:target_path_of_pkg packages
+  List.map
+    ~f:(fun pkg ->
+      Paths.make ~relative:Path.Build.relative (Project_dependencies ctx_name) pkg
+      |> Paths.target_dir
+      |> Path.build)
+    packages
   |> Action_builder.paths
   |> Rules.Produce.Alias.add_deps alias
 ;;

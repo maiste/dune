@@ -338,19 +338,6 @@ let gen_rules_group_part_or_root sctx dir_contents cctxs ~source_dir ~dir
   contexts
 ;;
 
-let gen_project_rule_for_package_alias sctx project =
-  let ctx = Super_context.context sctx in
-  let ctx_name = Context.name ctx in
-  let* is_lock_dir_active = Lock_dir.lock_dir_active ctx_name in
-  if is_lock_dir_active
-  then (
-    let dir =
-      Path.Build.append_source (Context.build_dir ctx) @@ Dune_project.root project
-    in
-    Pkg_rules.gen_rule_alias_from_package_universe ~dir ctx_name)
-  else Memo.return ()
-;;
-
 (* Warn whenever [(name <name>)]) is missing from the [dune-project] file *)
 let missing_project_name =
   Warning.make
@@ -368,7 +355,6 @@ let gen_project_rules =
     and+ () = Odoc.gen_project_rules sctx project
     and+ () = Odoc_new.gen_project_rules sctx project
     and+ () = Ocaml_index.project_rule sctx project
-    and+ () = gen_project_rule_for_package_alias sctx project
     and+ () =
       let version = 2, 8 in
       match Dune_project.allow_approximate_merlin project with
@@ -705,6 +691,41 @@ let raise_on_lock_dir_out_of_sync =
   |> Staged.unstage
 ;;
 
+(* let gen_project_rule_for_package_alias = *)
+(*   Per_context.create_by_name ~name:"register-pkg-alias" (fun ctx_name -> *)
+(*     Super_context.find ctx_name *)
+(*     >>= function *)
+(*     | None -> Memo.return () *)
+(*     | Some sctx -> *)
+(*       let ctx = Super_context.context sctx in *)
+(*       let* is_lock_dir_active = Lock_dir.lock_dir_active ctx_name in *)
+(*       if is_lock_dir_active *)
+(*       then ( *)
+(*         let dir = Context.build_dir ctx in *)
+(*         let alias = Alias.make Alias0.pkg_install ~dir in *)
+(*         let* pkg_rule = Pkg_rules.gen_rule_alias_from_package_universe ~dir ctx_name in *)
+(*         Super_context.add_alias_action sctx alias ~dir ~loc:Loc.none pkg_rule) *)
+(*       else Memo.return ()) *)
+(*   |> Staged.unstage *)
+(* ;; *)
+
+let gen_dummy_rules ~dir ctx_name =
+  let* sctx = Super_context.find_exn ctx_name in
+  let ctx = Super_context.context sctx in
+  let build_dir = Context.build_dir ctx in
+  if Path.Build.equal dir build_dir
+  then
+    Rules.collect_unit (fun () ->
+      let* is_lock_dir_active = Lock_dir.lock_dir_active ctx_name in
+      if is_lock_dir_active
+      then (
+        let dummy = Alias.make ~dir (Alias.Name.of_string "pkg-install") in
+        let* action = Pkg_rules.gen_rule_alias_from_package_universe ctx_name in
+        Super_context.add_alias_action sctx ~loc:Loc.none ~dir dummy action)
+      else Memo.return ())
+  else Memo.return Rules.empty
+;;
+
 let gen_rules ctx ~dir components =
   if Context_name.equal ctx Install.Context.install_context.name
   then (
@@ -734,6 +755,13 @@ let gen_rules ctx ~dir components =
   else if Context_name.equal ctx Fetch_rules.context.name
   then Fetch_rules.gen_rules ~dir ~components
   else
+    (* TODO: please rename everything correctly. Sincerely past you. *)
     let* () = raise_on_lock_dir_out_of_sync ctx in
-    gen_rules ctx (Super_context.find_exn ctx) ~dir components
+    let dummy_rule = gen_dummy_rules ~dir ctx in
+    let dummy_rule =
+      Gen_rules.rules_for ~dir ~allowed_subdirs:String.Set.empty dummy_rule
+      |> Gen_rules.rules_here
+    in
+    let+ general_rule = gen_rules ctx (Super_context.find_exn ctx) ~dir components in
+    Gen_rules.combine general_rule dummy_rule
 ;;

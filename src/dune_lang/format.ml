@@ -27,7 +27,9 @@ let print_wrapped_list ~version x =
   if version < (2, 8)
   then Pp.char '(' ++ Pp.hovbox ~indent:1 inner ++ Pp.char ')'
   else
-    (if version < (3, 17) then Pp.hvbox else Pp.hovbox)
+    (if version < (3, 17)
+     then Pp.hvbox
+     else User_error.raise Pp.[ text "Nope it's juste failing!" ])
       ~indent:1
       (Pp.char '(' ++ inner ++ Pp.char ')')
 ;;

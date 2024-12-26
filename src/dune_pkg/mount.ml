@@ -11,7 +11,7 @@ let backend t = t
 
 let of_opam_url loc url =
   let* () = Fiber.return () in
-  match OpamUrl.local_or_git_only url loc with
+  match OpamUrl.local_or_git_or_tar_only url loc with
   | `Path dir -> Fiber.return (Path dir)
   | `Git ->
     let+ rev =
@@ -23,6 +23,30 @@ let of_opam_url loc url =
       >>| User_error.ok_exn
     in
     Git rev
+  | `Tar ->
+    let url = OpamUrl.to_string url in
+    let dir = Path.Build.(L.relative root [ "_fetch"; "url" ]) |> Path.build in
+    let target = Digest.string url |> Digest.to_hex |> Path.relative dir in
+    let temp_dir =
+      let prefix = "dune" in
+      let suffix = Filename.basename url in
+      Temp_dir.dir_for_target ~target ~prefix ~suffix
+    in
+    Fiber.finalize ~finally:(fun () ->
+      Temp.destroy Dir temp_dir;
+      Fiber.return ())
+    @@ fun () ->
+    let output = Path.relative temp_dir "download" in
+    Curl.run ~temp_dir ~url ~output
+    >>= (function
+     | Error e -> raise (User_error.E e)
+     | Ok () ->
+       let target =
+         let file_digest = Digest.file (Path.to_string output) |> Digest.to_hex in
+         Path.relative dir file_digest
+       in
+       let+ path = Tar.load_or_untar ~target ~archive:output in
+       Path path)
 ;;
 
 let read t file =

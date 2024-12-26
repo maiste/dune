@@ -30,11 +30,17 @@ let is_version_control t =
 
 let is_local t = String.equal t.transport "file"
 
-let local_or_git_only url loc =
+let is_tarball t =
+  let supported_compress_format = [ "tar.gz"; "tgz"; "tar.bz2"; "tbz" ] in
+  List.exists ~f:(fun suffix -> String.is_suffix ~suffix t.path) supported_compress_format
+;;
+
+let local_or_git_or_tar_only url loc =
   match (url : t).backend with
   | `rsync when is_local url -> `Path (Path.of_string url.path)
   | `git -> `Git
-  | `rsync | `http | `darcs | `hg ->
+  | `http when is_tarball url -> `Tar
+  | `rsync | `darcs | `hg | `http ->
     User_error.raise
       ~loc
       ~hints:[ Pp.text "Specify either a file path or git repo via SSH/HTTPS" ]

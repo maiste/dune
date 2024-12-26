@@ -312,8 +312,11 @@ let resolve (t : DB.t) ~(scan_project : Scan_project.t)
           ]
   in
   let opam_package stack (package : Local_package.pin) =
+    Format.printf "Getting closer to the problem!@.";
     let* resolved_package = Pinned_package.resolve_package package in
+    Format.printf "Maybe here?@.";
     resolve package.name resolved_package;
+    Format.printf "Or later here?@.";
     Resolved_package.opam_file resolved_package
     |> OpamFile.OPAM.pin_depends
     |> List.filter_map ~f:(fun (pkg, url) ->

@@ -34,7 +34,8 @@ let local_or_git_only url loc =
   match (url : t).backend with
   | `rsync when is_local url -> `Path (Path.of_string url.path)
   | `git -> `Git
-  | `rsync | `http | `darcs | `hg ->
+  | `http -> User_error.raise [ Pp.text "Can't catch me haha!" ]
+  | `rsync | `darcs | `hg ->
     User_error.raise
       ~loc
       ~hints:[ Pp.text "Specify either a file path or git repo via SSH/HTTPS" ]

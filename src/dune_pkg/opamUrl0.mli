@@ -16,9 +16,9 @@ val is_version_control : t -> bool
 val is_local : t -> bool
 
 (* [local_or_git_only t loc] returns [`Path p] for a URL pointing to a local
-   file system or [`Git] if it's a git repository (remote or otherwise). If
-   it's neither of those cases, it will error out. *)
-val local_or_git_only : t -> Loc.t -> [ `Path of Path.t | `Git ]
+   file system, [`Git] if it's a git repository (remote or otherwise) or [`Tar]
+   if it's a tar repository. If it's neither of those cases, it will error out. *)
+val local_or_git_or_tar_only : t -> Loc.t -> [ `Path of Path.t | `Git | `Tar ]
 
 module Map : Map.S with type key = t
 module Set : Set.S with type elt = t and type 'a map = 'a Map.t

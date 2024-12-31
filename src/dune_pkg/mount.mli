@@ -7,6 +7,7 @@ type t
 type backend =
   | Path of Path.t
   | Git of Rev_store.At_rev.t
+  | Tar of Path.t
 
 val backend : t -> backend
 val of_opam_url : Loc.t -> OpamUrl.t -> t Fiber.t

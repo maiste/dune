@@ -4,6 +4,7 @@ open Fiber.O
 type backend =
   | Path of Path.t
   | Git of Rev_store.At_rev.t
+  | Tar of Path.t
 
 type t = backend
 
@@ -11,7 +12,7 @@ let backend t = t
 
 let of_opam_url loc url =
   let* () = Fiber.return () in
-  match OpamUrl.local_or_git_only url loc with
+  match OpamUrl.local_or_git_or_tar_only url loc with
   | `Path dir -> Fiber.return (Path dir)
   | `Git ->
     let+ rev =
@@ -23,6 +24,22 @@ let of_opam_url loc url =
       >>| User_error.ok_exn
     in
     Git rev
+  | `Tar ->
+    (* HACK: This can be factorized *)
+    let url = OpamUrl.to_string url in
+    let temp_dir =
+      let prefix = "dune" in
+      let suffix = Filename.basename url in
+      let target =
+        Path.Build.(relative root "/tar") |> Path.Build.local |> Path.of_local
+      in
+      Temp_dir.dir_for_target ~target ~prefix ~suffix
+    in
+    let output = Path.relative temp_dir "download" in
+    Curl.run ~temp_dir ~url ~output
+    >>= (function
+     | Error _message -> failwith "TODO(maiste): handle error message"
+     | Ok () -> Fiber.return (Tar Path.root))
 ;;
 
 let read t file =
@@ -34,6 +51,7 @@ let read t file =
     (match Io.read_file ~binary:true file with
      | s -> Some s
      | exception Unix.Unix_error (ENOENT, _, _) -> None)
+  | Tar _dir -> failwith "TODO(maiste): read"
 ;;
 
 let stat t path =
@@ -63,6 +81,7 @@ let stat t path =
                String.equal basename (Path.Local.basename path))
           then `File
           else `Absent_or_unrecognized))
+  | Tar _dir -> failwith "TODO(maiste): stat"
 ;;
 
 let readdir t dir =
@@ -93,4 +112,5 @@ let readdir t dir =
          | None -> None
          | Some kind -> Some (name, kind))
        |> Filename.Map.of_list_exn)
+  | Tar _dir -> failwith "TODO(maiste): tar"
 ;;

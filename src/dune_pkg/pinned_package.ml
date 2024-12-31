@@ -61,7 +61,6 @@ let discover_layout loc name mount =
 ;;
 
 let resolve_package { Local_package.loc; url = loc_url, url; name; version; origin = _ } =
-  (* TODO: this function is failing!!! *)
   let package =
     OpamPackage.create
       (Package_name.to_opam_package_name name)
@@ -100,6 +99,7 @@ let resolve_package { Local_package.loc; url = loc_url, url; name; version; orig
         ~opam_file_contents
         rev
         ~files_dir
+    | Tar _dir -> failwith "TODO(maiste): resolved_package"
   in
   Resolved_package.set_url resolved_package url
 ;;

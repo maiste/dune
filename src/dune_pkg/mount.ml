@@ -24,23 +24,12 @@ let of_opam_url loc url =
     in
     Git rev
   | `Tar ->
-    let url = OpamUrl.to_string url in
     let dir = Path.Build.(L.relative root [ "_fetch"; "url" ]) |> Path.build in
-    let target = Digest.string url |> Digest.to_hex |> Path.relative dir in
-    let temp_dir =
-      let prefix = "dune" in
-      let suffix = Filename.basename url in
-      Temp_dir.dir_for_target ~target ~prefix ~suffix
-    in
-    Fiber.finalize ~finally:(fun () ->
-      Temp.destroy Dir temp_dir;
-      Fiber.return ())
-    @@ fun () ->
-    let output = Path.relative temp_dir "download" in
-    Curl.run ~temp_dir ~url ~output
+    Source.fetch_archive_cached (Loc.none, url)
     >>= (function
-     | Error e -> raise (User_error.E e)
-     | Ok () ->
+     | Error (Some e) -> raise (User_error.E e)
+     | Error None -> failwith "todo"
+     | Ok output ->
        let target =
          let file_digest = Digest.file (Path.to_string output) |> Digest.to_hex in
          Path.relative dir file_digest

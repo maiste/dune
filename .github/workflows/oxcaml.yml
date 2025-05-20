@@ -26,9 +26,10 @@ jobs:
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ocaml-variants.5.2.0+flambda2
-          # CR maiste: this repository needs to be updated when upstream is working
+          # CR maiste: Update jst to not depend on a working commit anymore. It
+          # prevents non working commits to break the Dune CI
           opam-repositories: |
-            art-w: "git+https://github.com/art-w/jst-opam-repository.git#init-ocaml-4.14.2"
+            jst: "git+https://github.com/janestreet/opam-repository#cbf6161d54895c14a9ee8dd62aaf69a317bf5b04"
             default: "git+https://github.com/ocaml/opam-repository.git"
 
       - name: Install deps

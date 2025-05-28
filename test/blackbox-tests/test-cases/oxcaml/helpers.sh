@@ -40,6 +40,16 @@ EOF
   make_dummy_impl "$name" "$name"
 }
 
+make_lib_parameterized() {
+  name="$1"
+  parameter="$2"
+  make_dir_with_dune $name <<EOF
+(library
+  (name $name)
+  (parameters $parameter))
+EOF
+}
+
 target_cmi() {
   echo "./$1/.$1.objs/byte/$1.cmi"
 }

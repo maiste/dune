@@ -6,120 +6,66 @@ Two simple parameters.
 
   $ init_project
 
-  $ create_dune_dir "foo" <<EOF
+  $ make_dir_with_dune "foo" <<EOF
   > (library_parameter
   >   (name foo))
   > EOF
+  $ make_dummy_intf "foo" "foo"
 
-  $ cat > foo/foo.mli <<EOF
-  > type t
-  > val foo: t -> unit
-  > EOF
-
-  $ create_dune_dir "bar" <<EOF
+  $ make_dir_with_dune "bar" <<EOF
   > (library_parameter
   >   (name bar))
   > EOF
+  $ make_dummy_intf "bar" "bar"
 
-  $ cat > bar/bar.mli <<EOF
-  > type t
-  > val bar: t -> unit
-  > EOF
-
-TODO(@maiste) improve the handling of the result
-  $ dune build > /dev/null
+TODO(@maiste): remove /dev/null
+  $ dune build $(target_cmi "foo")> /dev/null
 
 A library implementing the parameter.
 
-  $ clean_build
+  $ rm -rf _build
+  $ make_lib_impl "foo_impl" "foo"
 
-  $ create_dune_dir "foo_impl" <<EOF
-  > (library
-  >  (name foo_impl)
-  >  (implements foo))
-  > EOF
-
-  $ cat > foo_impl/foo_impl.ml <<EOF
-  > type t = int
-  > let foo _ = ()
-  > let ignore_me = 42
-  > EOF
+TODO(@maiste): remove /dev/null
+  $ dune build > /dev/null
 
 A library implementing the parameter with a bigger interface than
 what the parameter expects.
 
-  $ clean_build
-  $ rm -rf foo_impl
+  $ rm -rf _build
+  $ echo "let ignore_me = 42" >> foo_impl/foo_impl.ml
 
-  $ create_dune_dir "foo_impl" <<EOF
-  > (library
-  >  (name foo_impl)
-  >  (implements foo))
-  > EOF
-
-  $ cat > foo_impl/foo_impl.ml <<EOF
-  > type t = int
-  > let foo _ = ()
-  > let ignore_me = 42
-  > EOF
-
-TODO(@maiste) improve the handling of the result
-  $ dune build foo_impl > /dev/null
-
+TODO(@maiste): remove /dev/null
+  $ dune build > /dev/null
 
 A library implementing a parameter with the wrong interface.
 
-  $ clean_build
-  $ rm -rf foo_impl
+  $ rm -rf _build
+  $ echo "type t = int" > foo_impl/foo_impl.ml
 
-  $ create_dune_dir "foo_impl" <<EOF
-  > (library
-  >  (name foo_impl)
-  >  (implements foo))
-  > EOF
-
-  $ cat > foo_impl/foo_impl.ml <<EOF
-  > type t = int
-  > EOF
-
-TODO(@maiste) improve the handling of the result
+TODO(@maiste): remove /dev/null
   $ dune build > /dev/null
   File "foo_impl/foo_impl.ml", line 1:
   Error: The argument module foo_impl/foo_impl.ml
          does not match the parameter signature foo/.foo.objs/byte/foo.cmi: 
-         The value foo is required but not provided
-         File "foo/foo.mli", line 2, characters 0-18: Expected declaration
+         The value f is required but not provided
+         File "foo/foo.mli", line 2, characters 0-17: Expected declaration
   [1]
 
 A library implementing the parameter, but importing the content from other files.
 
-  $ clean_build
-  $ rm -rf foo_impl
+  $ rm -rf _build
 
-  $ create_dune_dir "foo_impl" <<EOF
-  > (library
-  >  (name foo_impl)
-  >  (implements foo))
-  > EOF
+  $ echo "type t = int" > foo_impl/aux_type.ml
+  $ echo "type t" > foo_impl/aux_type.mli
 
-  $ cat > foo_impl/aux_type.ml <<EOF
-  > type t = int
-  > EOF
-  $ cat > foo_impl/aux_type.mli <<EOF
-  > type t
-  > EOF
-
-  $ cat > foo_impl/aux_impl.ml <<EOF
-  > let foo _ = ()
-  > EOF
-  $ cat > foo_impl/aux_impl.mli <<EOF
-  > val foo: Aux_type.t -> unit
-  > EOF
+  $ echo "let f _ = ()" > foo_impl/aux_impl.ml
+  $ echo "val f: Aux_type.t -> unit" > foo_impl/aux_impl.mli
 
   $ cat > foo_impl/foo_impl.ml <<EOF
   > include Aux_type
   > include Aux_impl
   > EOF
 
-TODO(@maiste) improve the handling of the result
+TODO(@maiste): remove /dev/null
   $ dune build > /dev/null

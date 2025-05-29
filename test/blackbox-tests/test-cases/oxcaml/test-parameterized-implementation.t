@@ -73,7 +73,7 @@ with the add interface.
   > EOF
 
 TODO(@maiste): remove /dev/null
-FIXME: support instanciation
+FIXME: support instantiation
   $ dune build > /dev/null
   File "int_two/dune", line 3, characters 12-36:
   3 |  (libraries ((two int_impl) :as two))
@@ -92,7 +92,7 @@ We generate an executable that depends on the implementation of the library.
   > let _ = print_endline (string_of_int Lib_int.two)
   > EOF
 
-FIXME: support instanciation
+FIXME: support instantiation
   $ dune exec -- bin.main.exe
   File "bin/dune", line 3, characters 12-37:
   3 |  (libraries (int_two simple_int_impl) :as lib_int)) 

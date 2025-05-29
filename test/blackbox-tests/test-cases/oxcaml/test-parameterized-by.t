@@ -73,7 +73,7 @@ TODO(@maiste): remove /dev/null
   [1]
 
 Fails when creating a library dependending on a parametrized library but
-without instanciation.
+without instantiation.
 
   $ rm -rf _build
   $ cat > "param_func/param_func.ml" <<EOF
@@ -105,7 +105,7 @@ FIXME: clearer error message and it should be detected earlier
 
 
 It fails when creating an executable using a parametrized library without
-instanciation.
+instantiation.
 
   $ rm -rf _build lib
 

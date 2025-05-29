@@ -52,7 +52,7 @@ Create a parameterized library and make sure it build.
 TODO(@maiste): remove /dev/null
   $ dune build > /dev/null
 
-We create an instanciation of the parametrized library with its implementation.
+We create an instantiation of the parametrized library with its implementation.
 
   $ make_dir_with_dune "param_inst" << EOF
   > (executable

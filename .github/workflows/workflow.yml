@@ -222,7 +222,9 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - uses: actions/checkout@v4
-      - run: opam switch create . -y --deps-only
+      - run: opam switch create . --empty
+      - run: opam pin . -n --with-version=dev
+      - run: make dev-switch
 
   build-microbench:
     name: Build microbenchmarks
